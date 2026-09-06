@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DPCM &amp; Delta Modulation Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#10161d;
+  --panel:#1a2330;
+  --panel-2:#212c3b;
+  --inset:#0c1117;
+  --border:rgba(255,255,255,0.09);
+  --border-strong:rgba(255,255,255,0.16);
+  --text:#e7ecf2;
+  --text-muted:#8b97a6;
+  --text-faint:#5c6675;
+  --teal:#4fd1c5;
+  --amber:#f5a623;
+  --violet:#a48cf5;
+  --coral:#e8607a;
+  --green:#6ee7a8;
+  --radius:7px;
+  --sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 48px;}
+
+/* header */
+header{padding:4px 2px 20px;border-bottom:1px solid var(--border);margin-bottom:18px;}
+header h1{
+  font-size:1.5rem;margin:0 0 6px;font-weight:700;letter-spacing:-0.01em;
+  color:var(--text);
+}
+header p{margin:0;color:var(--text-muted);font-size:0.92rem;max-width:60ch;}
+header .exp-tag{
+  display:inline-block;font-family:var(--mono);font-size:0.72rem;color:var(--teal);
+  border:1px solid rgba(79,209,197,0.35);background:rgba(79,209,197,0.07);
+  padding:2px 8px;border-radius:4px;margin-bottom:10px;
+}
+
+/* tabs */
+.tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab-btn{
+  flex:0 0 auto;background:none;border:none;color:var(--text-muted);
+  font-family:var(--sans);font-size:0.88rem;font-weight:500;
+  padding:9px 14px;cursor:pointer;border-bottom:2px solid transparent;
+  white-space:nowrap;transition:color .15s ease,border-color .15s ease;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--teal);border-bottom-color:var(--teal);}
+
+.tab-panel{display:none;}
+.tab-panel.active{display:block;animation:fadein .18s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}
+
+/* cards */
+.card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 16px 18px;margin-bottom:14px;
+}
+.card h2{
+  font-size:0.78rem;font-weight:600;margin:0 0 12px;color:var(--text-muted);
+  letter-spacing:0.01em;
+}
+.card h2 .n{color:var(--text-faint);font-family:var(--mono);margin-right:6px;}
+.card + .card{margin-top:0;}
+
+/* controls */
+.ctrl-row{margin-bottom:14px;}
+.ctrl-row:last-child{margin-bottom:0;}
+.ctrl-label-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:8px;}
+.ctrl-label-row label{font-size:0.87rem;color:var(--text);}
+.ctrl-label-row .val{font-family:var(--mono);font-size:0.85rem;color:var(--teal);white-space:nowrap;}
+.ctrl-help{font-size:0.76rem;color:var(--text-faint);margin-top:5px;}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:4px;border-radius:2px;
+  background:var(--panel-2);outline:none;border:1px solid var(--border);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:var(--teal);cursor:pointer;border:2px solid var(--bg);
+  box-shadow:0 0 0 1px rgba(79,209,197,0.5);
+}
+input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;background:var(--teal);cursor:pointer;
+  border:2px solid var(--bg);box-shadow:0 0 0 1px rgba(79,209,197,0.5);
+}
+select{
+  width:100%;background:var(--panel-2);color:var(--text);border:1px solid var(--border);
+  border-radius:5px;padding:8px 10px;font-family:var(--sans);font-size:0.87rem;
+}
+.preset-row{display:flex;gap:8px;margin-top:8px;}
+.preset-btn{
+  flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--text-muted);
+  font-family:var(--sans);font-size:0.78rem;padding:7px 4px;border-radius:5px;cursor:pointer;
+  transition:all .12s ease;
+}
+.preset-btn:hover{border-color:var(--border-strong);color:var(--text);}
+.preset-btn.active{border-color:var(--teal);color:var(--teal);background:rgba(79,209,197,0.08);}
+
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.switch-row .lbl{font-size:0.87rem;}
+.switch-row .sub{font-size:0.76rem;color:var(--text-faint);margin-top:2px;}
+.switch{position:relative;width:40px;height:22px;flex:0 0 auto;}
+.switch input{opacity:0;width:0;height:0;position:absolute;}
+.switch .track{
+  position:absolute;inset:0;background:var(--panel-2);border:1px solid var(--border);
+  border-radius:22px;cursor:pointer;transition:background .15s;
+}
+.switch .track:before{
+  content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;
+  background:var(--text-muted);border-radius:50%;transition:transform .15s,background .15s;
+}
+.switch input:checked + .track{background:rgba(164,140,245,0.18);border-color:var(--violet);}
+.switch input:checked + .track:before{transform:translateX(18px);background:var(--violet);}
+
+/* pipeline strip */
+.pipeline{display:flex;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
+.pipe-box{
+  flex:1;min-width:140px;background:var(--panel-2);border:1px solid var(--border);
+  border-radius:6px;padding:10px 12px;
+}
+.pipe-box .stage{font-size:0.72rem;color:var(--text-faint);margin-bottom:4px;}
+.pipe-box .name{font-size:0.86rem;font-weight:600;margin-bottom:5px;}
+.pipe-box .formula{font-family:var(--mono);font-size:0.76rem;color:var(--teal);}
+.pipe-arrow{display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:1.1rem;padding:0 2px;}
+@media (max-width:520px){.pipe-arrow{display:none;}}
+
+/* charts */
+.chart-box{position:relative;height:210px;margin-bottom:6px;}
+.chart-box.small{height:76px;}
+.chart-caption{font-size:0.76rem;color:var(--text-faint);margin-top:2px;}
+
+/* readouts */
+.readouts{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
+.readout{
+  flex:1;min-width:118px;background:var(--inset);border:1px solid var(--border);
+  border-radius:6px;padding:9px 12px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.35);
+}
+.readout .rl{font-size:0.71rem;color:var(--text-faint);margin-bottom:3px;}
+.readout .rv{font-family:var(--mono);font-size:1.05rem;font-weight:600;color:var(--text);}
+.readout .rv.teal{color:var(--teal);}
+.readout .rv.amber{color:var(--amber);}
+.readout .rv.violet{color:var(--violet);}
+.readout .rv.green{color:var(--green);}
+.readout .rv.coral{color:var(--coral);}
+
+/* badges/tags */
+.tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:500;
+  padding:4px 9px;border-radius:5px;border:1px solid;margin:2px 6px 2px 0;
+}
+.tag.pass{color:var(--green);border-color:rgba(110,231,168,0.4);background:rgba(110,231,168,0.08);}
+.tag.fail{color:var(--coral);border-color:rgba(232,96,122,0.4);background:rgba(232,96,122,0.08);}
+.tag.warn{color:var(--amber);border-color:rgba(245,166,35,0.4);background:rgba(245,166,35,0.08);}
+.tag.neutral{color:var(--text-muted);border-color:var(--border);background:var(--panel-2);}
+
+.note{font-size:0.83rem;color:var(--text-muted);background:var(--panel-2);border:1px solid var(--border);
+  border-radius:6px;padding:10px 12px;margin-top:10px;}
+.note b{color:var(--text);}
+.note code{font-family:var(--mono);color:var(--teal);font-size:0.82rem;}
+
+.theory-grid{display:grid;grid-template-columns:1fr;gap:8px;}
+@media (min-width:560px){.theory-grid{grid-template-columns:1fr 1fr;}}
+.theory-box{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;}
+.theory-box .th-label{font-size:0.71rem;color:var(--text-faint);margin-bottom:4px;}
+.theory-box .th-body{font-size:0.85rem;}
+
+footer{margin-top:24px;text-align:center;color:var(--text-faint);font-size:0.76rem;}
+
+/* how it works tab */
+.notes h3{font-size:0.92rem;margin:0 0 6px;color:var(--text);}
+.notes p{font-size:0.87rem;color:var(--text-muted);margin:0 0 12px;}
+.notes ul{margin:0 0 12px;padding-left:20px;}
+.notes li{font-size:0.87rem;color:var(--text-muted);margin-bottom:5px;}
+.notes .formula-line{font-family:var(--mono);font-size:0.82rem;color:var(--teal);background:var(--inset);
+  padding:8px 10px;border-radius:5px;margin:6px 0 12px;display:block;border:1px solid var(--border);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="exp-tag">Experiment 5</div>
+    <h1>DPCM &amp; delta modulation</h1>
+    <p>Explore how prediction reduces sample redundancy, then push step size and input speed until granular noise and slope overload appear.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="signal">Input signal</button>
+    <button class="tab-btn" data-tab="dpcm">DPCM</button>
+    <button class="tab-btn" data-tab="dm">Delta modulation</button>
+    <button class="tab-btn" data-tab="sweep">Step-size sweep</button>
+    <button class="tab-btn" data-tab="notes">How it works</button>
+  </div>
+
+  <!-- ============ SIGNAL TAB (shared inputs) ============ -->
+  <div class="tab-panel active" id="tab-signal">
+    <div class="card">
+      <h2>Test signal — shared across every tab</h2>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label-row"><label for="waveform">Waveform</label></div>
+        <select id="waveform">
+          <option value="sine">Sine — smooth, single tone</option>
+          <option value="harmonic">Two-tone — sine + 3rd harmonic</option>
+          <option value="square">Square-ish — sharp edges</option>
+        </select>
+        <div class="ctrl-help">Square-ish input has near-infinite slope at each edge, so it will trigger slope overload almost regardless of step size — useful as a stress test.</div>
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label-row"><label for="freq">Input frequency</label><span class="val" id="freqVal">300 Hz</span></div>
+        <input type="range" id="freq" min="20" max="2000" step="10" value="300">
+        <div class="preset-row">
+          <button class="preset-btn" data-target="freq" data-value="50">Slow</button>
+          <button class="preset-btn" data-target="freq" data-value="300">Moderate</button>
+          <button class="preset-btn" data-target="freq" data-value="1200">Fast</button>
+        </div>
+        <div class="ctrl-help" id="freqHelp"></div>
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label-row"><label for="amp">Amplitude</label><span class="val" id="ampVal">1.00</span></div>
+        <input type="range" id="amp" min="0.2" max="1.0" step="0.05" value="1.0">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label-row"><label for="nsamp">Samples shown</label></div>
+        <select id="nsamp">
+          <option value="120">Short (120)</option>
+          <option value="220" selected>Medium (220)</option>
+          <option value="400">Long (400)</option>
+        </select>
+        <div class="ctrl-help">Internal sampling rate is fixed at 8000 Hz (telephony-style), so this only changes how many samples are plotted — see "How it works".</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Original waveform</h2>
+      <div class="chart-box"><canvas id="chartInput"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ============ DPCM TAB ============ -->
+  <div class="tab-panel" id="tab-dpcm">
+    <div class="card">
+      <h2>First-order DPCM predictor — controls</h2>
+      <div class="ctrl-row">
+        <div class="ctrl-label-row"><label for="predA">Predictor coefficient a</label><span class="val" id="predAVal">1.00</span></div>
+        <input type="range" id="predA" min="0" max="1" step="0.05" value="1.0">
+        <div class="ctrl-help">x̂[n] = a · x<sub>r</sub>[n−1]. a = 1 is the classic "previous reconstructed sample" predictor; lower values leak toward zero.</div>
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label-row"><label for="dpcmBits">Quantizer bits (error signal)</label><span class="val" id="dpcmBitsVal">4 bits (16 levels)</span></div>
+        <input type="range" id="dpcmBits" min="1" max="8" step="1" value="4">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Pipeline — kept explicit on purpose</h2>
+      <div class="pipeline">
+        <div class="pipe-box">
+          <div class="stage">Stage 1</div>
+          <div class="name">Predict</div>
+          <div class="formula">x̂[n] = a·x<sub>r</sub>[n−1]</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-box">
+          <div class="stage">Stage 2</div>
+          <div class="name">Quantize the error</div>
+          <div class="formula">e[n] = x[n]−x̂[n] → e<sub>q</sub>[n]</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-box">
+          <div class="stage">Stage 3</div>
+          <div class="name">Reconstruct</div>
+          <div class="formula">x<sub>r</sub>[n] = x̂[n]+e<sub>q</sub>[n]</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Original, predicted &amp; reconstructed samples</h2>
+      <div class="chart-box"><canvas id="chartDpcmSignal"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2>Prediction error — DPCM vs. plain PCM quantization error</h2>
+      <div class="chart-box"><canvas id="chartDpcmError"></canvas></div>
+      <div class="chart-caption">Teal = raw prediction error e[n] before quantization · Violet = quantized DPCM error e<sub>q</sub>[n] · Coral = what a plain PCM quantizer at the same bit depth would leave as error.</div>
+    </div>
+
+    <div class="card">
+      <h2>Task 15 — comparison</h2>
+      <div class="readouts">
+        <div class="readout"><div class="rl">MSE, plain PCM</div><div class="rv coral" id="mseP">–</div></div>
+        <div class="readout"><div class="rl">MSE, DPCM</div><div class="rv violet" id="mseD">–</div></div>
+        <div class="readout"><div class="rl">Coding gain</div><div class="rv green" id="codingGain">–</div></div>
+      </div>
+      <div class="note" id="dpcmNote"></div>
+    </div>
+  </div>
+
+  <!-- ============ DELTA MODULATION TAB ============ -->
+  <div class="tab-panel" id="tab-dm">
+    <div class="card">
+      <h2>Step size Δ</h2>
+      <div class="ctrl-row">
+        <div class="ctrl-label-row"><label for="delta">Step size</label><span class="val" id="deltaVal">0.050</span></div>
+        <input type="range" id="delta" min="0.005" max="0.5" step="0.005" value="0.05">
+        <div class="preset-row">
+          <button class="preset-btn" data-target="delta" data-value="0.01">Small</button>
+          <button class="preset-btn" data-target="delta" data-value="0.05">Moderate</button>
+          <button class="preset-btn" data-target="delta" data-value="0.2">Large</button>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <div class="switch-row">
+          <div>
+            <div class="lbl">Adaptive step size</div>
+            <div class="sub">Doubles Δ after 2 same-direction bits, resets on a direction change (task 18, optional)</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="adaptive"><span class="track"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Delta staircase</h2>
+      <div class="chart-box"><canvas id="chartDmStaircase"></canvas></div>
+      <div class="chart-caption">Teal = original signal · Violet stepped line = delta-modulator reconstruction.</div>
+      <div class="chart-box small"><canvas id="chartDmBits"></canvas></div>
+      <div class="chart-caption">Output bitstream: each bar is one transmitted bit, +Δ (up) or −Δ (down).</div>
+    </div>
+
+    <div class="card">
+      <h2>Mandatory validation</h2>
+      <div id="validationTag"></div>
+      <div class="note" id="validationDetail"></div>
+    </div>
+
+    <div class="card">
+      <h2>Expected vs. observed</h2>
+      <div class="theory-grid">
+        <div class="theory-box">
+          <div class="th-label">Theoretical expectation (from Δ vs. required slope)</div>
+          <div class="th-body" id="theoryPrediction">–</div>
+        </div>
+        <div class="theory-box">
+          <div class="th-label">Simulated result</div>
+          <div class="th-body" id="observedResult">–</div>
+        </div>
+      </div>
+      <div class="readouts" style="margin-top:10px;">
+        <div class="readout"><div class="rl">MSE</div><div class="rv violet" id="mseDm">–</div></div>
+        <div class="readout"><div class="rl">Max tracking lag</div><div class="rv amber" id="maxLag">–</div></div>
+        <div class="readout"><div class="rl">RMS tracking lag</div><div class="rv teal" id="rmsLag">–</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SWEEP TAB ============ -->
+  <div class="tab-panel" id="tab-sweep">
+    <div class="card">
+      <h2>MSE versus step size</h2>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-top:0;">Sweeps Δ on a log scale for the current input signal (frequency and waveform from the "Input signal" tab), using plain (non-adaptive) delta modulation.</p>
+      <div class="chart-box"><canvas id="chartSweep"></canvas></div>
+      <div class="chart-caption">Violet dot = your current Δ from the Delta modulation tab · Green dot = the Δ that minimizes MSE for this signal.</div>
+      <div class="readouts">
+        <div class="readout"><div class="rl">Optimal Δ</div><div class="rv green" id="optDelta">–</div></div>
+        <div class="readout"><div class="rl">MSE at optimal Δ</div><div class="rv green" id="optMse">–</div></div>
+        <div class="readout"><div class="rl">MSE at your Δ</div><div class="rv violet" id="curMse">–</div></div>
+      </div>
+      <div class="note">Left of the minimum, Δ is too small to track the signal's steepest slope — <b>slope overload</b> dominates. Right of the minimum, Δ is larger than the signal needs, so the staircase oscillates around the true value — <b>granular noise</b> dominates.</div>
+    </div>
+  </div>
+
+  <!-- ============ NOTES TAB ============ -->
+  <div class="tab-panel" id="tab-notes">
+    <div class="card notes">
+      <h2>Assumptions &amp; formulas used</h2>
+
+      <h3>Sampling</h3>
+      <p>Internal sampling rate is fixed at f<sub>s</sub> = 8000 Hz. The "samples shown" control only changes how many samples are generated and plotted, not the underlying rate.</p>
+
+      <h3>First-order DPCM predictor</h3>
+      <span class="formula-line">x̂[n] = a · x_r[n−1]&nbsp;&nbsp;&nbsp;e[n] = x[n] − x̂[n]&nbsp;&nbsp;&nbsp;x_r[n] = x̂[n] + e_q[n]</span>
+      <p>Prediction always uses the <b>reconstructed</b> sample x_r[n−1], not the original x[n−1] — this is what makes it a closed-loop coder, so encoder and decoder stay in sync. The error quantizer's range is set automatically from the signal's own maximum sample-to-sample change, scaled up 20% as headroom, so the quantizer is neither wastefully wide nor clipping.</p>
+      <p>The very first sample x_r[0] is coded directly with a plain PCM quantizer at the same bit depth, since there is no previous sample to predict from yet.</p>
+
+      <h3>Plain PCM comparison</h3>
+      <p>Uses a uniform quantizer directly on x[n], at the same bit depth as the DPCM error quantizer, over the full amplitude range, for a fair bit-for-bit comparison.</p>
+
+      <h3>Delta modulation</h3>
+      <span class="formula-line">bit[n] = +1 if x[n] ≥ x_r[n−1], else −1&nbsp;&nbsp;&nbsp;x_r[n] = x_r[n−1] + bit[n]·Δ</span>
+      <p>The reconstruction starts at x_r[0] = 0, the standard assumption for a 1-bit delta modulator with no separate start-up channel.</p>
+
+      <h3>Adaptive delta modulation</h3>
+      <p>A simplified doubling scheme: Δ resets to Δ<sub>min</sub> = Δ/4 whenever the bit direction changes, and doubles (capped at Δ<sub>max</sub> = 4·Δ) whenever two consecutive bits share the same direction. This is the same idea behind classic schemes like continuously variable slope delta modulation, simplified for teaching.</p>
+
+      <h3>Mandatory validation</h3>
+      <p>Every consecutive pair of reconstructed samples is checked: |x_r[n] − x_r[n−1]| must equal the Δ that was in force at step n, within floating-point tolerance. This is checked for both plain and adaptive delta modulation.</p>
+
+      <h3>Theoretical slope-overload / granular-noise prediction</h3>
+      <p>Computed directly from the signal, with no dependence on the bitstream: let S<sub>max</sub> be the largest sample-to-sample change in x[n], and S<sub>rms</sub> its root-mean-square change.</p>
+      <ul>
+        <li>Slope overload is predicted when Δ &lt; S<sub>max</sub> — the staircase physically cannot move fast enough for the steepest part of the signal.</li>
+        <li>Granular noise is predicted when Δ &gt; 2.5 × S<sub>rms</sub> — the step is oversized relative to what the signal typically needs, so it overshoots on quiet stretches.</li>
+      </ul>
+
+      <h3>MSE vs. step size sweep</h3>
+      <p>Δ is swept on a log scale between 0.002 and 2.5× the current amplitude, using plain (non-adaptive) delta modulation on the currently selected waveform and frequency.</p>
+    </div>
+  </div>
+
+  <footer>Built for lab use — verify results against your own hand analysis before submitting.</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- DSP core ---------------- */
+const FS = 8000;
+
+function genSignal(type, freq, amp, N){
+  const x = new Array(N);
+  for(let n=0;n<N;n++){
+    const t = n/FS;
+    if(type==='sine') x[n] = amp*Math.sin(2*Math.PI*freq*t);
+    else if(type==='harmonic') x[n] = amp*0.7*Math.sin(2*Math.PI*freq*t) + amp*0.3*Math.sin(2*Math.PI*3*freq*t);
+    else if(type==='square') x[n] = amp*Math.sign(Math.sin(2*Math.PI*freq*t) || 1);
+  }
+  return x;
+}
+
+function quantize(v, range, bits){
+  const levels = Math.pow(2, bits);
+  const step = (2*range)/levels;
+  let idx = Math.floor((v+range)/step);
+  idx = Math.max(0, Math.min(levels-1, idx));
+  return { q: -range + (idx+0.5)*step, step };
+}
+
+function runDPCM(x, a, bits){
+  const N = x.length;
+  const xhat = new Array(N).fill(0);
+  const e = new Array(N).fill(0);
+  const eq = new Array(N).fill(0);
+  const xr = new Array(N).fill(0);
+
+  // error quantizer range derived from the signal itself, using the SAME predictor
+  // coefficient the loop will use — e.g. a=0 means no prediction, so the "error" is
+  // the full signal, not just its sample-to-sample change, and the range must reflect that.
+  let maxDiff = 0;
+  for(let n=1;n<N;n++) maxDiff = Math.max(maxDiff, Math.abs(x[n]-a*x[n-1]));
+  const errRange = Math.max(maxDiff*1.2, 1e-6);
+
+  const ampGuess = Math.max(...x.map(Math.abs), 1e-6);
+  const first = quantize(x[0], ampGuess, bits);
+  xr[0] = first.q; xhat[0]=0; e[0]=x[0]; eq[0]=first.q;
+
+  let qstep = null;
+  for(let n=1;n<N;n++){
+    xhat[n] = a*xr[n-1];
+    e[n] = x[n]-xhat[n];
+    const { q, step } = quantize(e[n], errRange, bits);
+    eq[n]=q; qstep=step;
+    xr[n] = xhat[n]+eq[n];
+  }
+  return { xhat, e, eq, xr, qstep, errRange };
+}
+
+function runPCM(x, bits){
+  const amp = Math.max(...x.map(Math.abs), 1e-6);
+  const xq = x.map(v=>quantize(v, amp, bits).q);
+  return xq;
+}
+
+function runDM(x, delta, adaptive){
+  const N = x.length;
+  const xr = new Array(N).fill(0);
+  const bit = new Array(N).fill(0);
+  const deltaUsed = new Array(N).fill(delta);
+  xr[0]=0;
+  const dMin = delta*0.25, dMax = delta*4;
+  let d = adaptive ? dMin : delta;
+  let prevBit = 0;
+  for(let n=1;n<N;n++){
+    bit[n] = (x[n] >= xr[n-1]) ? 1 : -1;
+    deltaUsed[n] = d;
+    xr[n] = xr[n-1] + bit[n]*d;
+    if(adaptive){
+      if(n>=2 && bit[n]===prevBit) d = Math.min(d*2, dMax);
+      else d = dMin;
+    }
+    prevBit = bit[n];
+  }
+  return { xr, bit, deltaUsed };
+}
+
+function mse(a,b){ let s=0; for(let i=0;i<a.length;i++){ const d=a[i]-b[i]; s+=d*d; } return s/a.length; }
+
+function validateSteps(xr, deltaUsed, tol){
+  tol = tol || 1e-9;
+  for(let n=1;n<xr.length;n++){
+    const diff = Math.abs(xr[n]-xr[n-1]);
+    const expected = deltaUsed[n];
+    if(Math.abs(diff-expected) > tol) return { pass:false, n, diff, expected };
+  }
+  return { pass:true };
+}
+
+function requiredSlopes(x){
+  let maxS=0, sumSq=0;
+  for(let n=1;n<x.length;n++){ const d=Math.abs(x[n]-x[n-1]); maxS=Math.max(maxS,d); sumSq+=d*d; }
+  return { maxS, rms: Math.sqrt(sumSq/(x.length-1)) };
+}
+
+function sweepMse(x, deltaMin, deltaMax, points){
+  const out = [];
+  for(let i=0;i<points;i++){
+    const delta = deltaMin * Math.pow(deltaMax/deltaMin, i/(points-1));
+    const { xr } = runDM(x, delta, false);
+    out.push({ delta, mse: mse(x, xr) });
+  }
+  return out;
+}
+
+/* ---------------- UI state ---------------- */
+const $ = id => document.getElementById(id);
+
+function state(){
+  return {
+    waveform: $('waveform').value,
+    freq: +$('freq').value,
+    amp: +$('amp').value,
+    N: +$('nsamp').value,
+    predA: +$('predA').value,
+    dpcmBits: +$('dpcmBits').value,
+    delta: +$('delta').value,
+    adaptive: $('adaptive').checked
+  };
+}
+
+function fmt(v, d){ if(v===undefined||v===null||isNaN(v)) return '–'; return v.toFixed(d===undefined?4:d); }
+function fmtSci(v){ if(v===undefined||v===null||isNaN(v)) return '–'; return v.toExponential(2); }
+
+/* ---------------- Chart setup ---------------- */
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.color = '#8b97a6';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+
+function baseOpts(extra){
+  const o = {
+    responsive:true, maintainAspectRatio:false, animation:false,
+    interaction:{mode:'nearest', axis:'x', intersect:false},
+    plugins:{ legend:{ position:'top', labels:{ boxWidth:12, boxHeight:2, font:{size:10} } } },
+    scales:{
+      x:{ ticks:{ maxTicksLimit:8, font:{size:9} }, grid:{ color:'rgba(255,255,255,0.05)' } },
+      y:{ ticks:{ font:{size:9} }, grid:{ color:'rgba(255,255,255,0.05)' } }
+    }
+  };
+  return Object.assign(o, extra||{});
+}
+
+const charts = {};
+
+function makeLineChart(canvasId, datasets, opts){
+  const ctx = $(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, { type:'line', data:{ labels:[], datasets }, options: baseOpts(opts) });
+  return charts[canvasId];
+}
+
+charts.input = makeLineChart('chartInput', [
+  { label:'x[n]', data:[], borderColor:'#4fd1c5', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.15 }
+]);
+
+charts.dpcmSignal = makeLineChart('chartDpcmSignal', [
+  { label:'original x[n]', data:[], borderColor:'#4fd1c5', borderWidth:1.6, pointRadius:0, tension:0.15 },
+  { label:'predicted x̂[n]', data:[], borderColor:'#f5a623', borderWidth:1.2, borderDash:[3,3], pointRadius:0, tension:0.15 },
+  { label:'reconstructed xr[n]', data:[], borderColor:'#a48cf5', borderWidth:1.4, pointRadius:0, tension:0.15 }
+]);
+
+charts.dpcmError = makeLineChart('chartDpcmError', [
+  { label:'e[n] (raw)', data:[], borderColor:'#4fd1c5', borderWidth:1.2, pointRadius:0, tension:0.1 },
+  { label:'eq[n] (DPCM, quantized)', data:[], borderColor:'#a48cf5', borderWidth:1.4, stepped:true, pointRadius:0 },
+  { label:'PCM error', data:[], borderColor:'#e8607a', borderWidth:1.1, pointRadius:0, tension:0.1 }
+]);
+
+charts.dmStaircase = makeLineChart('chartDmStaircase', [
+  { label:'original x[n]', data:[], borderColor:'#4fd1c5', borderWidth:1.6, pointRadius:0, tension:0.15 },
+  { label:'staircase xr[n]', data:[], borderColor:'#a48cf5', borderWidth:1.4, stepped:true, pointRadius:0 }
+]);
+
+charts.dmBits = new Chart($('chartDmBits').getContext('2d'), {
+  type:'bar',
+  data:{ labels:[], datasets:[{ label:'bit', data:[], backgroundColor:'#a48cf5', barPercentage:1.0, categoryPercentage:1.0 }] },
+  options: baseOpts({
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ display:false },
+      y:{ min:-1.3, max:1.3, ticks:{ callback:v=> v===1?'+Δ':(v===-1?'−Δ':''), font:{size:9} }, grid:{ color:'rgba(255,255,255,0.05)' } }
+    }
+  })
+});
+
+charts.sweep = new Chart($('chartSweep').getContext('2d'), {
+  type:'line',
+  data:{ datasets:[
+    { type:'line', label:'MSE(Δ)', data:[], borderColor:'#4fd1c5', backgroundColor:'transparent', borderWidth:1.8, pointRadius:0, parsing:false },
+    { type:'scatter', label:'your Δ', data:[], backgroundColor:'#a48cf5', borderColor:'#a48cf5', pointRadius:6, pointHoverRadius:6 },
+    { type:'scatter', label:'optimal Δ', data:[], backgroundColor:'#6ee7a8', borderColor:'#6ee7a8', pointRadius:6, pointHoverRadius:6 }
+  ]},
+  options: baseOpts({
+    parsing:false,
+    scales:{
+      x:{ type:'logarithmic', title:{ display:true, text:'step size Δ', color:'#8b97a6', font:{size:10} }, ticks:{ font:{size:9} }, grid:{ color:'rgba(255,255,255,0.05)' } },
+      y:{ title:{ display:true, text:'MSE', color:'#8b97a6', font:{size:10} }, ticks:{ font:{size:9} }, grid:{ color:'rgba(255,255,255,0.05)' } }
+    }
+  })
+});
+
+/* ---------------- Update logic ---------------- */
+function freqDescriptor(f){
+  if(f<120) return 'slowly varying';
+  if(f<600) return 'moderately varying';
+  return 'rapidly varying';
+}
+
+function updateAll(){
+  const s = state();
+  const x = genSignal(s.waveform, s.freq, s.amp, s.N);
+  const labels = x.map((_,n)=>n);
+
+  $('freqVal').textContent = s.freq + ' Hz';
+  $('ampVal').textContent = s.amp.toFixed(2);
+  $('predAVal').textContent = s.predA.toFixed(2);
+  $('dpcmBitsVal').textContent = s.dpcmBits + ' bits (' + Math.pow(2,s.dpcmBits) + ' levels)';
+  $('deltaVal').textContent = s.delta.toFixed(3);
+  $('freqHelp').textContent = 'Currently ' + freqDescriptor(s.freq) + ' (task 17: try slow vs. rapid inputs).';
+
+  syncPresetButtons('freq', s.freq);
+  syncPresetButtons('delta', s.delta);
+
+  // --- input chart ---
+  charts.input.data.labels = labels;
+  charts.input.data.datasets[0].data = x;
+  charts.input.update();
+
+  // --- DPCM ---
+  const dpcm = runDPCM(x, s.predA, s.dpcmBits);
+  const pcmQ = runPCM(x, s.dpcmBits);
+  const pcmErr = x.map((v,n)=>v-pcmQ[n]);
+
+  charts.dpcmSignal.data.labels = labels;
+  charts.dpcmSignal.data.datasets[0].data = x;
+  charts.dpcmSignal.data.datasets[1].data = dpcm.xhat;
+  charts.dpcmSignal.data.datasets[2].data = dpcm.xr;
+  charts.dpcmSignal.update();
+
+  charts.dpcmError.data.labels = labels;
+  charts.dpcmError.data.datasets[0].data = dpcm.e;
+  charts.dpcmError.data.datasets[1].data = dpcm.eq;
+  charts.dpcmError.data.datasets[2].data = pcmErr;
+  charts.dpcmError.update();
+
+  const msePcm = mse(x, pcmQ);
+  const mseDpcm = mse(x, dpcm.xr);
+  $('mseP').textContent = fmtSci(msePcm);
+  $('mseD').textContent = fmtSci(mseDpcm);
+  const gainDb = 10*Math.log10(msePcm/Math.max(mseDpcm,1e-12));
+  $('codingGain').textContent = (isFinite(gainDb)?gainDb.toFixed(1):'–') + ' dB';
+  let noteHtml = 'At <b>' + s.dpcmBits + ' bits</b>, DPCM\'s error-quantizer range is only <code>±' + dpcm.errRange.toFixed(3) +
+    '</code> (sized from the signal\'s own maximum prediction-error magnitude at a = ' + s.predA.toFixed(2) + '), versus PCM\'s full <code>±' + s.amp.toFixed(2) +
+    '</code> range at the same bit depth. When a is close to 1, prediction shrinks that range a lot and each quantization step gets finer — the source of DPCM\'s coding gain. Try dragging a toward 0 to see the gain shrink or disappear, since a weaker predictor leaves a bigger residual to quantize.';
+  if(gainDb < 0){
+    noteHtml += ' <b>Coding gain has gone negative here</b> — not a bug. At ' + s.freq + ' Hz against an 8000 Hz sampling rate, adjacent samples are changing quickly enough that they are only weakly correlated, so predicting x[n] from x<sub>r</sub>[n−1] buys little, and the closed-loop feedback can even add slightly to the error. Lower the frequency to see DPCM\'s advantage return.';
+  }
+  $('dpcmNote').innerHTML = noteHtml;
+
+  // --- Delta modulation ---
+  const dm = runDM(x, s.delta, s.adaptive);
+  charts.dmStaircase.data.labels = labels;
+  charts.dmStaircase.data.datasets[0].data = x;
+  charts.dmStaircase.data.datasets[1].data = dm.xr;
+  charts.dmStaircase.update();
+
+  charts.dmBits.data.labels = labels;
+  charts.dmBits.data.datasets[0].data = dm.bit;
+  charts.dmBits.data.datasets[0].backgroundColor = dm.bit.map(b=> b>=0 ? '#a48cf5' : '#6c5ce0');
+  charts.dmBits.update();
+
+  const val = validateSteps(dm.xr, dm.deltaUsed);
+  const vTag = $('validationTag');
+  if(val.pass){
+    vTag.innerHTML = '<span class="tag pass">✓ Pass</span> every reconstructed step changed by exactly ±Δ.';
+    $('validationDetail').textContent = s.adaptive
+      ? 'Adaptive mode: Δ itself varies sample to sample, but each individual step still matched the Δ in force at that instant.'
+      : 'Fixed step size Δ = ' + s.delta.toFixed(3) + ' was reproduced exactly at every sample.';
+  } else {
+    vTag.innerHTML = '<span class="tag fail">✕ Fail</span> step at sample n=' + val.n + ' did not match Δ.';
+    $('validationDetail').textContent = 'Expected step ±' + val.expected.toFixed(4) + ', measured ' + val.diff.toFixed(4) + '. This should not happen with the built-in modulator — treat it as a bug report.';
+  }
+
+  const { maxS, rms } = requiredSlopes(x);
+  const slopeOverloadExpected = s.delta < maxS;
+  const granularExpected = s.delta > 2.5*rms;
+
+  let predictionHtml;
+  if(slopeOverloadExpected){
+    predictionHtml = '<span class="tag fail">Slope overload</span> Δ (' + s.delta.toFixed(3) + ') is smaller than the signal\'s steepest step (' + maxS.toFixed(3) + '). The staircase cannot keep up.';
+  } else if(granularExpected){
+    predictionHtml = '<span class="tag warn">Granular noise</span> Δ (' + s.delta.toFixed(3) + ') is much larger than the signal\'s typical step (rms ' + rms.toFixed(3) + '). Expect visible oscillation on flatter stretches.';
+  } else {
+    predictionHtml = '<span class="tag pass">Well matched</span> Δ sits between the signal\'s rms step (' + rms.toFixed(3) + ') and its max step (' + maxS.toFixed(3) + ').';
+  }
+  $('theoryPrediction').innerHTML = predictionHtml;
+
+  let maxErr=0, sumSqErr=0;
+  for(let n=0;n<x.length;n++){ const e=Math.abs(x[n]-dm.xr[n]); maxErr=Math.max(maxErr,e); sumSqErr+=e*e; }
+  const rmsErr = Math.sqrt(sumSqErr/x.length);
+  const maxErrSteps = maxErr/s.delta, rmsErrSteps = rmsErr/s.delta;
+  $('maxLag').textContent = maxErrSteps.toFixed(2) + ' Δ';
+  $('rmsLag').textContent = rmsErrSteps.toFixed(2) + ' Δ';
+  $('mseDm').textContent = fmtSci(mse(x, dm.xr));
+
+  let observedHtml;
+  if(maxErrSteps > 2.2){
+    observedHtml = 'Tracking lag reached <b>' + maxErrSteps.toFixed(1) + ' steps</b> at its worst — consistent with slope overload.';
+  } else if(rmsErrSteps > 0.55){
+    observedHtml = 'Error stayed bounded (max ' + maxErrSteps.toFixed(1) + ' Δ) but oscillates persistently — consistent with granular noise.';
+  } else {
+    observedHtml = 'Error stayed small and bounded (max ' + maxErrSteps.toFixed(1) + ' Δ, rms ' + rmsErrSteps.toFixed(2) + ' Δ) — consistent with a well-matched step size.';
+  }
+  $('observedResult').innerHTML = observedHtml;
+
+  // --- sweep ---
+  const dMin = 0.002, dMax = Math.max(0.05, 2.5*s.amp);
+  const sweep = sweepMse(x, dMin, dMax, 32);
+  charts.sweep.data.datasets[0].data = sweep.map(p=>({x:p.delta, y:p.mse}));
+  let best = sweep[0];
+  for(const p of sweep) if(p.mse < best.mse) best = p;
+  charts.sweep.data.datasets[1].data = [{ x:s.delta, y: mse(x, dm.xr) }];
+  charts.sweep.data.datasets[2].data = [{ x:best.delta, y:best.mse }];
+  charts.sweep.update();
+
+  $('optDelta').textContent = best.delta.toFixed(3);
+  $('optMse').textContent = fmtSci(best.mse);
+  $('curMse').textContent = fmtSci(mse(x, dm.xr));
+}
+
+function syncPresetButtons(target, value){
+  document.querySelectorAll('.preset-btn[data-target="'+target+'"]').forEach(btn=>{
+    btn.classList.toggle('active', Math.abs(+btn.dataset.value - value) < 1e-9);
+  });
+}
+
+/* ---------------- wiring ---------------- */
+['waveform','freq','amp','nsamp','predA','dpcmBits','delta','adaptive'].forEach(id=>{
+  $(id).addEventListener('input', updateAll);
+  $(id).addEventListener('change', updateAll);
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const target = btn.dataset.target;
+    $(target).value = btn.dataset.value;
+    updateAll();
+  });
+});
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    $('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+updateAll();
+})();
+</script>
+</body>
+</html>
